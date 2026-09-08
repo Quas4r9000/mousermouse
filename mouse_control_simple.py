@@ -5,7 +5,8 @@ from pynput.mouse import Controller, Button
 PORT = "/dev/cu.usbserial-A5069RR4"
 BAUD = 115200
 SPEED = 3
-RAPIDFIRE_INTERVAL = 0.1
+RAPIDFIRE = True
+RAPIDFIRE_INTERVAL = 0.2
 
 mouse = Controller()
 ser = serial.Serial(PORT, BAUD, timeout=0.05)
@@ -55,20 +56,32 @@ while True:
         if dx != 0 or dy != 0:
             mouse.move(dx, dy)
 
-        # Left mouse button - rapid fire
-        now = time.time()
-        if state.get("LC") and (now - left_last_fire >= RAPIDFIRE_INTERVAL or not left_was_down):
-            mouse.press(Button.left)
-            mouse.release(Button.left)
-            left_last_fire = now
+        # Left mouse button
+        if RAPIDFIRE:
+            now = time.time()
+            if state.get("LC") and (now - left_last_fire >= RAPIDFIRE_INTERVAL or not left_was_down):
+                mouse.press(Button.left)
+                mouse.release(Button.left)
+                left_last_fire = now
+        else:
+            if state.get("LC") and not left_was_down:
+                mouse.press(Button.left)
+            elif not state.get("LC") and left_was_down:
+                mouse.release(Button.left)
 
         left_was_down = state.get("LC")
 
-        # Right mouse button - rapid fire
-        if state.get("RC") and (now - right_last_fire >= RAPIDFIRE_INTERVAL or not right_was_down):
-            mouse.press(Button.right)
-            mouse.release(Button.right)
-            right_last_fire = now
+        # Right mouse button
+        if RAPIDFIRE:
+            if state.get("RC") and (now - right_last_fire >= RAPIDFIRE_INTERVAL or not right_was_down):
+                mouse.press(Button.right)
+                mouse.release(Button.right)
+                right_last_fire = now
+        else:
+            if state.get("RC") and not right_was_down:
+                mouse.press(Button.right)
+            elif not state.get("RC") and right_was_down:
+                mouse.release(Button.right)
 
         right_was_down = state.get("RC")
 
