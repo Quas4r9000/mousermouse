@@ -1,92 +1,85 @@
 import serial
 import time
 import ctypes
-from ctypes import c_void_p, c_int, c_double, c_uint64, CDLL
-import os
+from ctypes import c_void_p, c_int, c_double, c_uint64, c_ubyte, Structure, pointer, CDLL
 from ctypes.util import find_library
 
-# Load CoreGraphics
-cg_path = find_library("CoreGraphics")
-cg = ctypes.CDLL(cg_path)
+# Load frameworks
+cg = CDLL(find_library("CoreGraphics"))
+cf = CDLL(find_library("CoreFoundation"))
 
-# Load CoreFoundation
-cf_path = find_library("CoreFoundation")
-cf = ctypes.CDLL(cf_path)
+# CoreFoundation
+cf.CFRelease.argtypes = [c_void_p]
+cf.CFRelease.restype = None
 
+# CoreGraphics types
+class CGPoint(Structure):
+    _fields_ = [("x", c_double), ("y", c_double)]
+
+# Function signatures
+cg.CGEventCreateMouseEvent.argtypes = [c_void_p, c_int, c_double, c_double]
+cg.CGEventCreateMouseEvent.restype = c_void_p
+
+cg.CGEventPost.argtypes = [c_int, c_void_p]
+cg.CGEventPost.restype = None
+
+cg.CGEventSetIntegerValueField.argtypes = [c_void_p, c_uint64, c_uint64]
+cg.CGEventSetIntegerValueField.restype = None
+
+cg.CGEventSetDoubleValueField.argtypes = [c_void_p, c_uint64, c_double]
+cg.CGEventSetDoubleValueField.restype = None
+
+# Constants
 kCGEventLeftMouseDown = 1
 kCGEventLeftMouseUp = 2
 kCGEventRightMouseDown = 3
 kCGEventRightMouseUp = 4
-kCGHIDEventScrollWheel = 22
-
-kCGMouseEventDeltaX = 0
-kCGMouseEventDeltaY = 1
-
-kCGWindowListOptionOnScreenOnly = 1
-kCGWindowLevelBelow = -1
-
-# Define function signatures
-cf.CFRelease.argtypes = [ctypes.c_void_p]
-cf.CFRelease.restype = None
-
-cg.CGEventCreate.argtypes = [ctypes.c_void_p]
-cg.CGEventCreate.restype = ctypes.c_void_p
-
-cg.CGEventCreateMouseEvent.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_double, ctypes.c_double]
-cg.CGEventCreateMouseEvent.restype = ctypes.c_void_p
-
-cg.CGEventPost.argtypes = [ctypes.c_int, ctypes.c_void_p]
-cg.CGEventPost.restype = None
-
-cg.CGEventSetIntegerValueField.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint64]
-cg.CGEventSetIntegerValueField.restype = None
-
-cg.CGEventSetDoubleValueField.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_double]
-cg.CGEventSetDoubleValueField.restype = None
-
 kCGHIDEventTap = 0
-kCGUEventSuppressionSuspended = 31
 
 PORT = "/dev/cu.usbserial-A5069RR4"
 BAUD = 115200
 SPEED = 5
 RAPIDFIRE = False
-RAPIDFIRE_INTERVAL = 0.1
+RAPIDFIRE_INTERVAL = 100  # ms
 RAPIDFIRE_TOGGLED = True
 
 ser = serial.Serial(PORT, BAUD, timeout=0.05)
 
-def send_mouse_move(dx, dy):
-    event = cg.CGEventCreateMouseEvent(None, 0, 0, 0)
-    cg.CGEventSetDoubleValueField(event, kCGMouseEventDeltaX, ctypes.c_double(dx))
-    cg.CGEventSetDoubleValueField(event, kCGMouseEventDeltaY, ctypes.c_double(dy))
-    cg.CGEventPost(kCGHIDEventTap, event)
-    cf.CFRelease(event)
+def send_move(dx, dy):
+    try:
+        event = cg.CGEventCreateMouseEvent(None, 0, 0, 0)
+        if event:
+            cg.CGEventSetDoubleValueField(event, 1, c_double(dx))  # kCGMouseEventDeltaX
+            cg.CGEventSetDoubleValueField(event, 2, c_double(dy))  # kCGMouseEventDeltaY
+            cg.CGEventPost(kCGHIDEventTap, event)
+            cf.CFRelease(event)
+    except Exception:
+        pass
 
-def send_left_down():
-    event = cg.CGEventCreateMouseEvent(None, kCGEventLeftMouseDown, 0, 0)
-    cg.CGEventPost(kCGHIDEventTap, event)
-    cf.CFRelease(event)
+def send_click(btn_down):
+    try:
+        evt_type = kCGEventLeftMouseDown if btn_down else kCGEventLeftMouseUp
+        event = cg.CGEventCreateMouseEvent(None, evt_type, 0, 0)
+        if event:
+            cg.CGEventPost(kCGHIDEventTap, event)
+            cf.CFRelease(event)
+    except Exception:
+        pass
 
-def send_left_up():
-    event = cg.CGEventCreateMouseEvent(None, kCGEventLeftMouseUp, 0, 0)
-    cg.CGEventPost(kCGHIDEventTap, event)
-    cf.CFRelease(event)
-
-def send_right_down():
-    event = cg.CGEventCreateMouseEvent(None, kCGEventRightMouseDown, 0, 0)
-    cg.CGEventPost(kCGHIDEventTap, event)
-    cf.CFRelease(event)
-
-def send_right_up():
-    event = cg.CGEventCreateMouseEvent(None, kCGEventRightMouseUp, 0, 0)
-    cg.CGEventPost(kCGHIDEventTap, event)
-    cf.CFRelease(event)
+def send_right_click(btn_down):
+    try:
+        evt_type = kCGEventRightMouseDown if btn_down else kCGEventRightMouseUp
+        event = cg.CGEventCreateMouseEvent(None, evt_type, 0, 0)
+        if event:
+            cg.CGEventPost(kCGHIDEventTap, event)
+            cf.CFRelease(event)
+    except Exception:
+        pass
 
 left_was_down = False
 right_was_down = False
-left_last_fire = 0.0
-right_last_fire = 0.0
+left_last_fire = 0
+right_last_fire = 0
 prev_state = {}
 
 def parse_state(line):
@@ -127,7 +120,7 @@ while True:
             dy += SPEED
 
         if dx != 0 or dy != 0:
-            send_mouse_move(dx, dy)
+            send_move(dx, dy)
 
         # Toggle rapidfire when all 4 directions pressed together
         all_directions = state.get("L") and state.get("R") and state.get("U") and state.get("D")
@@ -145,30 +138,32 @@ while True:
         # Left mouse button
         if RAPIDFIRE:
             now = time.time()
-            if state.get("LC") and (now - left_last_fire >= RAPIDFIRE_INTERVAL or not left_was_down):
-                send_left_down()
-                send_left_up()
+            if state.get("LC") and (now - left_last_fire >= RAPIDFIRE_INTERVAL / 1000 or not left_was_down):
+                send_click(True)
+                time.sleep(0.005)
+                send_click(False)
                 left_last_fire = now
         else:
             if state.get("LC") and not left_was_down:
-                send_left_down()
+                send_click(True)
             elif not state.get("LC") and left_was_down:
-                send_left_up()
+                send_click(False)
 
         left_was_down = state.get("LC")
 
         # Right mouse button
         if RAPIDFIRE:
             now = time.time()
-            if state.get("RC") and (now - right_last_fire >= RAPIDFIRE_INTERVAL or not right_was_down):
-                send_right_down()
-                send_right_up()
+            if state.get("RC") and (now - right_last_fire >= RAPIDFIRE_INTERVAL / 1000 or not right_was_down):
+                send_right_click(True)
+                time.sleep(0.005)
+                send_right_click(False)
                 right_last_fire = now
         else:
             if state.get("RC") and not right_was_down:
-                send_right_down()
+                send_right_click(True)
             elif not state.get("RC") and right_was_down:
-                send_right_up()
+                send_right_click(False)
 
         right_was_down = state.get("RC")
 
