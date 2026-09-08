@@ -1,6 +1,8 @@
 import serial
 import time
-from pynput.mouse import Controller, Button
+import pyautogui
+
+pyautogui.FAILSAFE = False
 
 PORT = "/dev/cu.usbserial-A5069RR4"
 BAUD = 115200
@@ -9,7 +11,6 @@ RAPIDFIRE = False
 RAPIDFIRE_INTERVAL = 0.1
 RAPIDFIRE_TOGGLED = True
 
-mouse = Controller()
 ser = serial.Serial(PORT, BAUD, timeout=0.05)
 
 left_was_down = False
@@ -56,7 +57,7 @@ while True:
             dy += SPEED
 
         if dx != 0 or dy != 0:
-            mouse.move(dx, dy)
+            pyautogui.move(dx, dy)
 
         # Toggle rapidfire when all 4 directions pressed together
         all_directions = state.get("L") and state.get("R") and state.get("U") and state.get("D")
@@ -75,28 +76,29 @@ while True:
         if RAPIDFIRE:
             now = time.time()
             if state.get("LC") and (now - left_last_fire >= RAPIDFIRE_INTERVAL or not left_was_down):
-                mouse.press(Button.left)
-                mouse.release(Button.left)
+                pyautogui.click()
                 left_last_fire = now
         else:
             if state.get("LC") and not left_was_down:
-                mouse.press(Button.left)
+                pyautogui.mouseDown(button="left")
             elif not state.get("LC") and left_was_down:
-                mouse.release(Button.left)
+                pyautogui.mouseUp(button="left")
 
         left_was_down = state.get("LC")
 
         # Right mouse button
         if RAPIDFIRE:
+            now = time.time()
             if state.get("RC") and (now - right_last_fire >= RAPIDFIRE_INTERVAL or not right_was_down):
-                mouse.press(Button.right)
-                mouse.release(Button.right)
+                pyautogui.click(button="right")
                 right_last_fire = now
         else:
             if state.get("RC") and not right_was_down:
-                mouse.press(Button.right)
+                pyautogui.mouseDown(button="right")
             elif not state.get("RC") and right_was_down:
-                mouse.release(Button.right)
+                pyautogui.mouseUp(button="right")
+
+        right_was_down = state.get("RC")
 
         prev_state = dict(state)
 
