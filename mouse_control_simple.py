@@ -1,9 +1,9 @@
 import serial
 from pynput.mouse import Controller, Button
 
-PORT = "COM8"
+PORT = "/dev/cu.usbserial-A5069RR4"
 BAUD = 115200
-SPEED = 5
+SPEED = 3
 
 mouse = Controller()
 ser = serial.Serial(PORT, BAUD, timeout=0.05)
@@ -23,7 +23,7 @@ def parse_state(line):
 
 while True:
     try:
-        line = ser.readline().decode("utf-8").strip()
+        line = ser.readline().decode("utf-8", errors="replace").strip()
 
         if not line:
             continue
