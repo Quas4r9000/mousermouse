@@ -5,8 +5,9 @@ from pynput.mouse import Controller, Button
 PORT = "/dev/cu.usbserial-A5069RR4"
 BAUD = 115200
 SPEED = 3
-RAPIDFIRE = True
-RAPIDFIRE_INTERVAL = 0.2
+RAPIDFIRE = False
+RAPIDFIRE_INTERVAL = 0.1
+RAPIDFIRE_TOGGLED = True
 
 mouse = Controller()
 ser = serial.Serial(PORT, BAUD, timeout=0.05)
@@ -15,6 +16,7 @@ left_was_down = False
 right_was_down = False
 left_last_fire = 0.0
 right_last_fire = 0.0
+prev_state = {}
 
 def parse_state(line):
     state = {}
@@ -56,6 +58,19 @@ while True:
         if dx != 0 or dy != 0:
             mouse.move(dx, dy)
 
+        # Toggle rapidfire when all 4 directions pressed together
+        all_directions = state.get("L") and state.get("R") and state.get("U") and state.get("D")
+        prev_all_directions = (
+            prev_state.get("L") and prev_state.get("R") and
+            prev_state.get("U") and prev_state.get("D")
+        ) if prev_state else False
+        if all_directions and not prev_all_directions and RAPIDFIRE_TOGGLED:
+            RAPIDFIRE = not RAPIDFIRE
+            print(f"Rapidfire: {'ON' if RAPIDFIRE else 'OFF'}")
+            RAPIDFIRE_TOGGLED = False
+        elif not all_directions:
+            RAPIDFIRE_TOGGLED = True
+
         # Left mouse button
         if RAPIDFIRE:
             now = time.time()
@@ -83,7 +98,7 @@ while True:
             elif not state.get("RC") and right_was_down:
                 mouse.release(Button.right)
 
-        right_was_down = state.get("RC")
+        prev_state = dict(state)
 
     except Exception as e:
         print("Error:", e)
