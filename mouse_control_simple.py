@@ -19,7 +19,10 @@ def parse_state(line):
     state = {}
 
     for item in line.split(","):
-        key, value = item.split(":")
+        parts = item.split(":")
+        if len(parts) != 2:
+            continue
+        key, value = parts
         state[key] = int(value)
 
     return state
@@ -37,16 +40,16 @@ while True:
         dx = 0
         dy = 0
 
-        if state["L"]:
+        if state.get("L"):
             dx -= SPEED
 
-        if state["R"]:
+        if state.get("R"):
             dx += SPEED
 
-        if state["U"]:
+        if state.get("U"):
             dy -= SPEED
 
-        if state["D"]:
+        if state.get("D"):
             dy += SPEED
 
         if dx != 0 or dy != 0:
@@ -54,20 +57,20 @@ while True:
 
         # Left mouse button - rapid fire
         now = time.time()
-        if state["LC"] and (now - left_last_fire >= RAPIDFIRE_INTERVAL or not left_was_down):
+        if state.get("LC") and (now - left_last_fire >= RAPIDFIRE_INTERVAL or not left_was_down):
             mouse.press(Button.left)
             mouse.release(Button.left)
             left_last_fire = now
 
-        left_was_down = state["LC"]
+        left_was_down = state.get("LC")
 
         # Right mouse button - rapid fire
-        if state["RC"] and (now - right_last_fire >= RAPIDFIRE_INTERVAL or not right_was_down):
+        if state.get("RC") and (now - right_last_fire >= RAPIDFIRE_INTERVAL or not right_was_down):
             mouse.press(Button.right)
             mouse.release(Button.right)
             right_last_fire = now
 
-        right_was_down = state["RC"]
+        right_was_down = state.get("RC")
 
     except Exception as e:
         print("Error:", e)
